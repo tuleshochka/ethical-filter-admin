@@ -1,46 +1,37 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Card, Table, Tag, Space, Typography, Button, Drawer, 
-  Radio, Input, Form, Select, DatePicker, Row, Col, Alert, message, Divider 
+  Radio, Input, Select, Row, Col, Alert, message, Divider 
 } from 'antd';
 import { 
-  HistoryOutlined, 
-  SearchOutlined, 
   AuditOutlined, 
   CheckCircleOutlined, 
   CloseCircleOutlined,
-  EyeInvisibleOutlined,
   ClockCircleOutlined
 } from '@ant-design/icons';
+import type { ColumnsType } from 'antd/es/table';
+import type { RequestLogEntry } from '../types.ts';
+import { STRATEGY_COLORS, API_BASE } from '../types.ts';
 
 const { Title, Paragraph, Text } = Typography;
 const { TextArea } = Input;
 
-const STRATEGY_COLORS = {
-  ALLOW: 'success',
-  SOFTEN: 'processing',
-  CAUTION: 'warning',
-  CLARIFY: 'warning',
-  REDIRECT: 'purple',
-  REFUSE: 'error',
-};
-
-const Logs = () => {
-  const [logs, setLogs] = useState([]);
+const Logs: React.FC = () => {
+  const [logs, setLogs] = useState<RequestLogEntry[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(10);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Filters state
-  const [strategyFilter, setStrategyFilter] = useState(null);
-  const [piiFilter, setPiiFilter] = useState(null);
-  const [reviewedFilter, setReviewedFilter] = useState(null);
+  const [strategyFilter, setStrategyFilter] = useState<string | null>(null);
+  const [piiFilter, setPiiFilter] = useState<boolean | null>(null);
+  const [reviewedFilter, setReviewedFilter] = useState<boolean | null>(null);
 
   // Drawer review state
-  const [selectedLog, setSelectedLog] = useState(null);
-  const [drawerVisible, setDrawerVisible] = useState(false);
+  const [selectedLog, setSelectedLog] = useState<RequestLogEntry | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [reviewCorrect, setReviewCorrect] = useState(true);
   const [reviewNote, setReviewNote] = useState('');
   const [reviewSaving, setReviewSaving] = useState(false);
@@ -53,7 +44,7 @@ const Logs = () => {
     setLoading(true);
     setError(null);
     try {
-      let url = `http://localhost:8000/api/v1/logs?page=${page}&size=${size}`;
+      let url = `${API_BASE}/logs?page=${page}&size=${size}`;
       if (strategyFilter) url += `&strategy=${strategyFilter}`;
       if (piiFilter !== null) url += `&pii_detected=${piiFilter}`;
       if (reviewedFilter !== null) url += `&reviewed=${reviewedFilter}`;
@@ -66,24 +57,24 @@ const Logs = () => {
       setTotal(data.total);
     } catch (err) {
       console.error(err);
-      setError(err.message);
+      setError(err instanceof Error ? err.message : 'Неизвестная ошибка');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleOpenDrawer = (record) => {
+  const handleOpenDrawer = (record: RequestLogEntry) => {
     setSelectedLog(record);
     setReviewCorrect(record.review_correct !== null ? record.review_correct : true);
     setReviewNote(record.review_note || '');
-    setDrawerVisible(true);
+    setDrawerOpen(true);
   };
 
   const handleSaveReview = async () => {
     if (!selectedLog) return;
     setReviewSaving(true);
     try {
-      const response = await fetch(`http://localhost:8000/api/v1/logs/${selectedLog.id}/review`, {
+      const response = await fetch(`${API_BASE}/logs/${selectedLog.id}/review`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -94,7 +85,7 @@ const Logs = () => {
       if (!response.ok) throw new Error('Ошибка при сохранении вердикта');
       
       message.success('Результат аудита успешно сохранен!');
-      setDrawerVisible(false);
+      setDrawerOpen(false);
       
       // Update log entry locally
       setLogs(prev => prev.map(item => 
@@ -103,7 +94,7 @@ const Logs = () => {
           : item
       ));
     } catch (err) {
-      message.error(err.message);
+      message.error(err instanceof Error ? err.message : 'Ошибка');
     } finally {
       setReviewSaving(false);
     }
@@ -116,36 +107,36 @@ const Logs = () => {
     setPage(1);
   };
 
-  const columns = [
+  const columns: ColumnsType<RequestLogEntry> = [
     {
       title: 'Время',
       dataIndex: 'timestamp',
       key: 'timestamp',
       width: '15%',
-      render: (text) => new Date(text).toLocaleString('ru-RU')
+      render: (text: string) => new Date(text).toLocaleString('ru-RU')
     },
     {
       title: 'Хеш текста',
       dataIndex: 'request_text_hash',
       key: 'hash',
       width: '10%',
-      render: (text) => <Text code style={{ fontSize: '12px' }}>{text.substring(0, 8)}...</Text>
+      render: (text: string) => <Text code style={{ fontSize: '12px' }}>{text.substring(0, 8)}...</Text>
     },
     {
       title: 'Маскированный запрос (Preview)',
       dataIndex: 'request_preview',
       key: 'preview',
       width: '30%',
-      render: (text) => <span style={{ color: '#475569', fontSize: '13px' }}>{text || '—'}</span>
+      render: (text: string) => <span style={{ color: '#475569', fontSize: '13px' }}>{text || '—'}</span>
     },
     {
       title: 'Макс. риск',
       dataIndex: 'max_risk_score',
       key: 'max_risk',
       width: '10%',
-      render: (score) => {
+      render: (score: number) => {
         const percent = (score * 100).toFixed(0);
-        let color = 'green';
+        let color: string = 'green';
         if (score >= 0.6) color = 'red';
         else if (score >= 0.3) color = 'orange';
         return <Tag color={color}>{percent}%</Tag>;
@@ -156,28 +147,28 @@ const Logs = () => {
       dataIndex: 'selected_strategy',
       key: 'strategy',
       width: '10%',
-      render: (strategy) => <Tag color={STRATEGY_COLORS[strategy] || 'default'}>{strategy}</Tag>
+      render: (strategy: string) => <Tag color={STRATEGY_COLORS[strategy] || 'default'}>{strategy}</Tag>
     },
     {
       title: 'PII',
       dataIndex: 'pii_detected',
       key: 'pii',
       width: '5%',
-      render: (pii) => pii ? <Tag color="error">Да</Tag> : <Tag color="default">Нет</Tag>
+      render: (pii: boolean) => pii ? <Tag color="error">Да</Tag> : <Tag color="default">Нет</Tag>
     },
     {
       title: 'Задержка',
       dataIndex: 'latency_ms',
       key: 'latency',
       width: '8%',
-      render: (lat) => <Space size={2}><ClockCircleOutlined style={{ color: '#94a3b8' }} /><Text>{lat} мс</Text></Space>
+      render: (lat: number) => <Space size={2}><ClockCircleOutlined style={{ color: '#94a3b8' }} /><Text>{lat} мс</Text></Space>
     },
     {
       title: 'Аудит',
       dataIndex: 'reviewed',
       key: 'reviewed',
       width: '12%',
-      render: (reviewed, record) => {
+      render: (reviewed: boolean, record: RequestLogEntry) => {
         if (!reviewed) return <Tag color="warning">Ожидает</Tag>;
         return record.review_correct ? (
           <Tag color="success" icon={<CheckCircleOutlined />}>Верно</Tag>
@@ -209,7 +200,7 @@ const Logs = () => {
               value={strategyFilter}
               onChange={(val) => { setStrategyFilter(val); setPage(1); }}
               options={[
-                { value: null, label: 'Все' },
+                { value: null as unknown as string, label: 'Все' },
                 { value: 'ALLOW', label: 'ALLOW' },
                 { value: 'SOFTEN', label: 'SOFTEN' },
                 { value: 'CAUTION', label: 'CAUTION' },
@@ -229,7 +220,7 @@ const Logs = () => {
               value={piiFilter}
               onChange={(val) => { setPiiFilter(val); setPage(1); }}
               options={[
-                { value: null, label: 'Все' },
+                { value: null as unknown as boolean, label: 'Все' },
                 { value: true, label: 'С PII' },
                 { value: false, label: 'Без PII' },
               ]}
@@ -245,7 +236,7 @@ const Logs = () => {
               value={reviewedFilter}
               onChange={(val) => { setReviewedFilter(val); setPage(1); }}
               options={[
-                { value: null, label: 'Все' },
+                { value: null as unknown as boolean, label: 'Все' },
                 { value: true, label: 'Проверен' },
                 { value: false, label: 'Ожидает' },
               ]}
@@ -259,10 +250,10 @@ const Logs = () => {
       </Card>
 
       {/* Main Table */}
-      <Card bordered={false} bodyStyle={{ padding: 0 }} style={{ boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
+      <Card bordered={false} styles={{ body: { padding: 0 } }} style={{ boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
         {error && <Alert message="Ошибка загрузки журнала" description={error} type="error" showIcon style={{ margin: '16px' }} />}
         
-        <Table
+        <Table<RequestLogEntry>
           dataSource={logs}
           columns={columns}
           rowKey="id"
@@ -293,9 +284,9 @@ const Logs = () => {
         }
         placement="right"
         width={550}
-        onClose={() => setDrawerVisible(false)}
-        visible={drawerVisible}
-        bodyStyle={{ padding: '24px' }}
+        onClose={() => setDrawerOpen(false)}
+        open={drawerOpen}
+        styles={{ body: { padding: '24px' } }}
       >
         {selectedLog && (
           <Space direction="vertical" size="large" style={{ width: '100%' }}>
@@ -317,7 +308,7 @@ const Logs = () => {
             </Row>
 
             <div>
-              <Text type="secondary" style={{ fontSize: '11px', display: 'block', textTransform: 'uppercase', marginBottom: '4px' }}>МАКИРОВАННЫЙ ТЕКСТ</Text>
+              <Text type="secondary" style={{ fontSize: '11px', display: 'block', textTransform: 'uppercase', marginBottom: '4px' }}>МАСКИРОВАННЫЙ ТЕКСТ</Text>
               <div style={{ padding: '12px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', color: '#1e293b', fontSize: '13px' }}>
                 {selectedLog.request_preview || '—'}
               </div>
@@ -355,8 +346,9 @@ const Logs = () => {
             <Divider style={{ margin: '12px 0' }}>Результат проверки (Аудит)</Divider>
 
             {/* Audit Form */}
-            <Form layout="vertical" onFinish={handleSaveReview}>
-              <Form.Item label={<Text strong>Вердикт классификации:</Text>}>
+            <div>
+              <div style={{ marginBottom: '16px' }}>
+                <Text strong style={{ display: 'block', marginBottom: '8px' }}>Вердикт классификации:</Text>
                 <Radio.Group 
                   value={reviewCorrect} 
                   onChange={(e) => setReviewCorrect(e.target.value)}
@@ -366,33 +358,32 @@ const Logs = () => {
                   <Radio.Button value={true} style={{ width: '230px', textAlign: 'center' }}>
                     <CheckCircleOutlined /> Верно (Фильтр сработал верно)
                   </Radio.Button>
-                  <Radio.Button value={false} style={{ width: '230px', textAlign: 'center' }} danger>
+                  <Radio.Button value={false} style={{ width: '230px', textAlign: 'center' }}>
                     <CloseCircleOutlined /> Ошибка (Ложное / Пропуск)
                   </Radio.Button>
                 </Radio.Group>
-              </Form.Item>
+              </div>
 
-              <Form.Item label={<Text strong>Примечание аудитора:</Text>}>
+              <div style={{ marginBottom: '16px' }}>
+                <Text strong style={{ display: 'block', marginBottom: '8px' }}>Примечание аудитора:</Text>
                 <TextArea
                   rows={4}
                   value={reviewNote}
                   onChange={(e) => setReviewNote(e.target.value)}
                   placeholder="Опишите дефекты классификации (например, ложное срабатывание на PII или пропуск токсичности)..."
                 />
-              </Form.Item>
+              </div>
 
-              <Form.Item>
-                <Button 
-                  type="primary" 
-                  onClick={handleSaveReview}
-                  loading={reviewSaving}
-                  icon={<AuditOutlined />}
-                  style={{ width: '100%', backgroundColor: '#4f46e5' }}
-                >
-                  Сохранить вердикт
-                </Button>
-              </Form.Item>
-            </Form>
+              <Button 
+                type="primary" 
+                onClick={handleSaveReview}
+                loading={reviewSaving}
+                icon={<AuditOutlined />}
+                style={{ width: '100%', backgroundColor: '#4f46e5' }}
+              >
+                Сохранить вердикт
+              </Button>
+            </div>
           </Space>
         )}
       </Drawer>

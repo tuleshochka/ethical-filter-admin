@@ -1,38 +1,58 @@
 import React from 'react';
 import { Menu, Layout, Typography, Space, Badge } from 'antd';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   DashboardOutlined, 
-  MessageOutlined, 
   SafetyCertificateOutlined, 
-  HistoryOutlined
+  HistoryOutlined,
+  AppstoreOutlined,
+  ExperimentOutlined
 } from '@ant-design/icons';
+import type { MenuProps } from 'antd';
+import type { Policy } from '../types.ts';
 
 const { Sider } = Layout;
 const { Title, Text } = Typography;
 
-const Sidebar = ({ currentTab, onChangeTab, activePolicy }) => {
-  const menuItems = [
+interface SidebarProps {
+  activePolicy: Policy | null;
+}
+
+const Sidebar: React.FC<SidebarProps> = ({ activePolicy }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const menuItems: MenuProps['items'] = [
     {
-      key: 'dashboard',
+      key: '/',
       icon: <DashboardOutlined style={{ fontSize: '18px' }} />,
       label: 'Аналитическая панель',
     },
     {
-      key: 'chat',
-      icon: <MessageOutlined style={{ fontSize: '18px' }} />,
-      label: 'Тестовый чат',
-    },
-    {
-      key: 'policies',
+      key: '/policies',
       icon: <SafetyCertificateOutlined style={{ fontSize: '18px' }} />,
       label: 'Политики безопасности',
     },
     {
-      key: 'logs',
+      key: '/categories',
+      icon: <AppstoreOutlined style={{ fontSize: '18px' }} />,
+      label: 'Категории риска',
+    },
+    {
+      key: '/logs',
       icon: <HistoryOutlined style={{ fontSize: '18px' }} />,
       label: 'Журнал и Аудит',
     },
+    {
+      key: '/model',
+      icon: <ExperimentOutlined style={{ fontSize: '18px' }} />,
+      label: 'Метрики модели',
+    },
   ];
+
+  const handleMenuClick: MenuProps['onClick'] = ({ key }) => {
+    navigate(key);
+  };
 
   return (
     <Sider
@@ -67,13 +87,10 @@ const Sidebar = ({ currentTab, onChangeTab, activePolicy }) => {
       <div style={{ flex: 1, padding: '16px 0' }}>
         <Menu
           mode="inline"
-          selectedKeys={[currentTab]}
-          onClick={({ key }) => onChangeTab(key)}
+          selectedKeys={[location.pathname]}
+          onClick={handleMenuClick}
           items={menuItems}
-          style={{
-            borderRight: 0,
-          }}
-          className="sidebar-menu"
+          style={{ borderRight: 0 }}
         />
       </div>
 

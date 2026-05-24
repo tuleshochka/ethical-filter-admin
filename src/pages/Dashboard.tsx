@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Col, Row, Statistic, Spin, Alert, Empty, Typography } from 'antd';
+import { Card, Col, Row, Statistic, Spin, Alert, Empty, Typography, Space } from 'antd';
 import { 
   FileTextOutlined, 
   ClockCircleOutlined, 
@@ -10,35 +10,21 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   BarChart, Bar, Cell, PieChart, Pie, Legend
 } from 'recharts';
+import type { LogStats } from '../types.ts';
+import { STRATEGY_HEX_COLORS, CATEGORY_COLORS, API_BASE } from '../types.ts';
 
 const { Title, Paragraph } = Typography;
 
-const STRATEGY_COLORS = {
-  ALLOW: '#10b981',    // green
-  SOFTEN: '#6366f1',   // indigo
-  CAUTION: '#f59e0b',  // amber
-  CLARIFY: '#3b82f6',  // blue
-  REDIRECT: '#8b5cf6', // purple
-  REFUSE: '#ef4444',   // red
-};
+interface ChartItem {
+  name: string;
+  value: number;
+  color: string;
+}
 
-const CATEGORY_COLORS = {
-  HARMFUL: '#ef4444',
-  VIOLENCE: '#f43f5e',
-  HATE: '#d97706',
-  MEDICAL: '#10b981',
-  LEGAL: '#06b6d4',
-  PII: '#3b82f6',
-  MISINFO: '#6366f1',
-  NSFW: '#ec4899',
-  SELFHARM: '#8b5cf6',
-  SENSITIVE: '#64748b',
-};
-
-const Dashboard = () => {
-  const [stats, setStats] = useState(null);
+const Dashboard: React.FC = () => {
+  const [stats, setStats] = useState<LogStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchStats();
@@ -48,15 +34,15 @@ const Dashboard = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('http://localhost:8000/api/v1/logs/stats');
+      const response = await fetch(`${API_BASE}/logs/stats`);
       if (!response.ok) {
         throw new Error('Не удалось загрузить статистику с сервера');
       }
-      const data = await response.json();
+      const data: LogStats = await response.json();
       setStats(data);
     } catch (err) {
       console.error(err);
-      setError(err.message);
+      setError(err instanceof Error ? err.message : 'Неизвестная ошибка');
     } finally {
       setLoading(false);
     }
@@ -97,7 +83,7 @@ const Dashboard = () => {
               <Space direction="vertical" size="small">
                 <Title level={4}>Нет данных для отображения</Title>
                 <Paragraph type="secondary">
-                  История запросов пуста. Отправьте несколько сообщений через «Тестовый чат», чтобы увидеть графики на аналитической панели.
+                  История запросов пуста. Отправьте несколько сообщений через чат-клиент, чтобы увидеть графики на аналитической панели.
                 </Paragraph>
               </Space>
             } 
@@ -108,14 +94,14 @@ const Dashboard = () => {
   }
 
   // Format strategy pie data
-  const pieData = Object.entries(stats.strategy_distribution).map(([name, value]) => ({
+  const pieData: ChartItem[] = Object.entries(stats.strategy_distribution).map(([name, value]) => ({
     name,
     value,
-    color: STRATEGY_COLORS[name] || '#64748b'
+    color: STRATEGY_HEX_COLORS[name] || '#64748b'
   }));
 
   // Format category bar data
-  const barData = Object.entries(stats.category_distribution).map(([name, value]) => ({
+  const barData: ChartItem[] = Object.entries(stats.category_distribution).map(([name, value]) => ({
     name,
     value,
     color: CATEGORY_COLORS[name] || '#64748b'
