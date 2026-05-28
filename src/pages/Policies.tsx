@@ -1,17 +1,19 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card, Typography, Tabs, Table, Tag, Space, Button, Select,
-  Slider, InputNumber, Spin, Alert, Switch, message, Input, Divider, Empty
+  Slider, InputNumber, Spin, Alert, Switch, message, Input, Divider, Empty, Tooltip
 } from 'antd';
 import { 
   EditOutlined, 
   SaveOutlined, 
   CloseOutlined,
-  RocketOutlined
+  RocketOutlined,
+  CopyOutlined,
+  DeleteOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import type { Policy, PolicyThreshold, RiskCategory, StrategyTemplate } from '../types.ts';
-import { STRATEGY_OPTIONS, STRATEGY_COLORS, API_BASE } from '../types.ts';
+import { STRATEGY_OPTIONS, STRATEGY_COLORS, STRATEGY_DESCRIPTIONS, API_BASE } from '../types.ts';
 
 const { Title, Paragraph, Text } = Typography;
 const { TextArea: AntTextArea } = Input;
@@ -153,6 +155,53 @@ const Policies: React.FC<PoliciesProps> = ({ onPolicyChanged }) => {
     }
   };
 
+  const handleClonePolicy = async () => {
+    if (!selectedPolicyId) return;
+    try {
+      const response = await fetch(`${API_BASE}/policies/${selectedPolicyId}/clone`, { method: 'POST' });
+      if (!response.ok) throw new Error('Ошибка клонирования политики');
+      
+      const newPolicy: Policy = await response.json();
+      setPolicies(prev => [...prev, newPolicy]);
+      setSelectedPolicyId(newPolicy.id);
+      message.success(`Политика «${newPolicy.name}» успешно клонирована!`);
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : 'Ошибка при клонировании');
+    }
+  };
+
+  const handleDeletePolicy = async () => {
+    if (!selectedPolicyId) return;
+    const policyToDelete = policies.find(p => p.id === selectedPolicyId);
+    if (!policyToDelete) return;
+    
+    if (policyToDelete.is_active) {
+      message.error('Нельзя удалить активную политику безопасности!');
+      return;
+    }
+    
+    try {
+      const response = await fetch(`${API_BASE}/policies/${selectedPolicyId}`, { method: 'DELETE' });
+      if (!response.ok) {
+        const errJson = await response.json();
+        throw new Error(errJson.detail || 'Ошибка при удалении политики');
+      }
+      
+      setPolicies(prev => prev.filter(p => p.id !== selectedPolicyId));
+      message.success(`Политика «${policyToDelete.name}» успешно удалена!`);
+      
+      // Select another policy
+      const remaining = policies.filter(p => p.id !== selectedPolicyId);
+      if (remaining.length > 0) {
+        setSelectedPolicyId(remaining[0].id);
+      } else {
+        setSelectedPolicyId(null);
+      }
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : 'Не удалось удалить политику');
+    }
+  };
+
   const handleUpdateStrategy = async (strategyId: number, field: string, value: string | boolean) => {
     try {
       const response = await fetch(`${API_BASE}/strategies/${strategyId}`, {
@@ -241,51 +290,90 @@ const Policies: React.FC<PoliciesProps> = ({ onPolicyChanged }) => {
       }
     },
     {
-      title: 'Стратегия (Low)',
+      title: 'Low-Risk Strategy',
       key: 'strategy_low',
       width: '12%',
       render: (_: unknown, record: PolicyThreshold) => {
         if (editingThresholdId === record.id && editForm) {
           return (
             <Select value={editForm.strategy_low} style={{ width: '100%' }} size="small"
-              options={STRATEGY_OPTIONS}
               onChange={(val) => setEditForm(prev => prev ? { ...prev, strategy_low: val } : null)}
-            />
+            >
+              {STRATEGY_OPTIONS.map(opt => (
+                <Select.Option key={opt.value} value={opt.value} title={STRATEGY_DESCRIPTIONS[opt.value]}>
+                  <Tooltip title={STRATEGY_DESCRIPTIONS[opt.value]} placement="right">
+                    <div style={{ width: '100%' }}>{opt.label}</div>
+                  </Tooltip>
+                </Select.Option>
+              ))}
+            </Select>
           );
         }
-        return <Tag color={STRATEGY_COLORS[record.strategy_low]}>{record.strategy_low}</Tag>;
+        return (
+          <Tooltip title={STRATEGY_DESCRIPTIONS[record.strategy_low]}>
+            <Tag color={STRATEGY_COLORS[record.strategy_low]} style={{ cursor: 'help' }}>
+              {record.strategy_low}
+            </Tag>
+          </Tooltip>
+        );
       }
     },
     {
-      title: 'Стратегия (Med)',
+      title: 'Medium-Risk Strategy',
       key: 'strategy_medium',
       width: '12%',
       render: (_: unknown, record: PolicyThreshold) => {
         if (editingThresholdId === record.id && editForm) {
           return (
             <Select value={editForm.strategy_medium} style={{ width: '100%' }} size="small"
-              options={STRATEGY_OPTIONS}
               onChange={(val) => setEditForm(prev => prev ? { ...prev, strategy_medium: val } : null)}
-            />
+            >
+              {STRATEGY_OPTIONS.map(opt => (
+                <Select.Option key={opt.value} value={opt.value} title={STRATEGY_DESCRIPTIONS[opt.value]}>
+                  <Tooltip title={STRATEGY_DESCRIPTIONS[opt.value]} placement="right">
+                    <div style={{ width: '100%' }}>{opt.label}</div>
+                  </Tooltip>
+                </Select.Option>
+              ))}
+            </Select>
           );
         }
-        return <Tag color={STRATEGY_COLORS[record.strategy_medium]}>{record.strategy_medium}</Tag>;
+        return (
+          <Tooltip title={STRATEGY_DESCRIPTIONS[record.strategy_medium]}>
+            <Tag color={STRATEGY_COLORS[record.strategy_medium]} style={{ cursor: 'help' }}>
+              {record.strategy_medium}
+            </Tag>
+          </Tooltip>
+        );
       }
     },
     {
-      title: 'Стратегия (High)',
+      title: 'High-Risk Strategy',
       key: 'strategy_high',
       width: '12%',
       render: (_: unknown, record: PolicyThreshold) => {
         if (editingThresholdId === record.id && editForm) {
           return (
             <Select value={editForm.strategy_high} style={{ width: '100%' }} size="small"
-              options={STRATEGY_OPTIONS}
               onChange={(val) => setEditForm(prev => prev ? { ...prev, strategy_high: val } : null)}
-            />
+            >
+              {STRATEGY_OPTIONS.map(opt => (
+                <Select.Option key={opt.value} value={opt.value} title={STRATEGY_DESCRIPTIONS[opt.value]}>
+                  <Tooltip title={STRATEGY_DESCRIPTIONS[opt.value]} placement="right">
+                    <div style={{ width: '100%' }}>{opt.label}</div>
+                  </Tooltip>
+                </Select.Option>
+              ))}
+            </Select>
           );
         }
-        return <Tag color={STRATEGY_COLORS[record.strategy_high]}>{record.strategy_high}</Tag>;
+        return (
+          <Tooltip title={STRATEGY_DESCRIPTIONS[record.strategy_high]}>
+            <Tag color={STRATEGY_COLORS[record.strategy_high]} style={{ cursor: 'help' }}>
+              {record.strategy_high}
+            </Tag>
+          </Tooltip>
+        );
       }
     },
     {
@@ -293,10 +381,15 @@ const Policies: React.FC<PoliciesProps> = ({ onPolicyChanged }) => {
       key: 'actions',
       width: '10%',
       render: (_: unknown, record: PolicyThreshold) => {
-        if (editingThresholdId === record.id) {
+        if (editingThresholdId === record.id && editForm) {
+          const isValidOrder = editForm.threshold_low < editForm.threshold_medium && editForm.threshold_medium < editForm.threshold_high;
           return (
             <Space>
-              <Button type="primary" size="small" icon={<SaveOutlined />}
+              <Button 
+                type="primary" 
+                size="small" 
+                icon={<SaveOutlined />}
+                disabled={!isValidOrder}
                 onClick={() => handleSaveThreshold(record.policy_id, record.id)}
               >
                 ОК
@@ -347,16 +440,26 @@ const Policies: React.FC<PoliciesProps> = ({ onPolicyChanged }) => {
             <Select
               value={selectedPolicyId}
               onChange={(val) => setSelectedPolicyId(val)}
-              options={policies.map(p => ({ value: p.id, label: `${p.name} ${p.is_active ? '(Активна)' : ''}` }))}
-              style={{ width: 300 }}
+              options={policies.map(p => ({ value: p.id, label: p.is_active ? `${p.name} — Активна` : p.name }))}
+              style={{ width: 250 }}
             />
             {selectedPolicy && !selectedPolicy.is_active && (
               <Button type="primary" icon={<RocketOutlined />} onClick={handleActivatePolicy}>
-                Сделать активной
+                Активировать
               </Button>
             )}
             {selectedPolicy?.is_active && (
-              <Tag color="success" style={{ padding: '4px 12px' }}>● Активна</Tag>
+              <Tag color="success" style={{ padding: '4px 12px', borderRadius: '4px' }}>● Активна</Tag>
+            )}
+            
+            <Button icon={<CopyOutlined />} onClick={handleClonePolicy}>
+              Клонировать
+            </Button>
+            
+            {selectedPolicy && !selectedPolicy.is_active && (
+              <Button danger icon={<DeleteOutlined />} onClick={handleDeletePolicy}>
+                Удалить
+              </Button>
             )}
           </Space>
 
@@ -404,7 +507,7 @@ const Policies: React.FC<PoliciesProps> = ({ onPolicyChanged }) => {
                   style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}
                 >
                   <div style={{ marginBottom: '12px' }}>
-                    <Text strong style={{ display: 'block', marginBottom: '4px' }}>Системный промпт (system_prompt):</Text>
+                    <Text strong style={{ display: 'block', marginBottom: '4px' }}>System Prompt:</Text>
                     <AntTextArea
                       rows={3}
                       defaultValue={s.system_prompt}
@@ -418,7 +521,7 @@ const Policies: React.FC<PoliciesProps> = ({ onPolicyChanged }) => {
                   </div>
                   <div>
                     <Text strong style={{ display: 'block', marginBottom: '4px' }}>
-                      Прямой ответ (user_message — bypass LLM):
+                      Bypass Response:
                     </Text>
                     <AntTextArea
                       rows={2}

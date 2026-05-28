@@ -10,6 +10,7 @@ import {
 } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 import type { Policy } from '../types.ts';
+import { API_BASE } from '../types.ts';
 
 const { Sider } = Layout;
 const { Title, Text } = Typography;
@@ -21,6 +22,25 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({ activePolicy }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [unreviewedCount, setUnreviewedCount] = React.useState(0);
+
+  const fetchUnreviewedCount = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/model/metrics`);
+      if (response.ok) {
+        const json = await response.json();
+        setUnreviewedCount(json.unreviewed_logs_count || 0);
+      }
+    } catch (err) {
+      console.error('Failed to fetch unreviewed count:', err);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchUnreviewedCount();
+    const interval = setInterval(fetchUnreviewedCount, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   const menuItems: MenuProps['items'] = [
     {
@@ -41,7 +61,18 @@ const Sidebar: React.FC<SidebarProps> = ({ activePolicy }) => {
     {
       key: '/logs',
       icon: <HistoryOutlined style={{ fontSize: '18px' }} />,
-      label: 'Журнал и Аудит',
+      label: (
+        <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: '8px' }}>
+          <span>Журнал и Аудит</span>
+          {unreviewedCount > 0 && (
+            <Badge 
+              count={unreviewedCount} 
+              style={{ backgroundColor: '#f59e0b', color: '#ffffff', boxShadow: 'none' }} 
+              size="small"
+            />
+          )}
+        </span>
+      ),
     },
     {
       key: '/model',
@@ -120,6 +151,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activePolicy }) => {
           </Space>
         </div>
       )}
+
     </Sider>
   );
 };

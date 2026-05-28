@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Card, Col, Row, Statistic, Spin, Alert, Button, Progress, Table, Typography, Space, Tooltip, message, Badge
+  Card, Col, Row, Statistic, Spin, Alert, Button, Progress, Table, Typography, Space, Tooltip, message, Badge, Slider
 } from 'antd';
 import {
   SafetyOutlined,
@@ -9,7 +9,9 @@ import {
   CheckCircleOutlined,
   ExclamationCircleOutlined,
   BarChartOutlined,
-  HistoryOutlined
+  HistoryOutlined,
+  SlidersOutlined,
+  DownloadOutlined
 } from '@ant-design/icons';
 import {
   LineChart,
@@ -53,22 +55,24 @@ interface ModelMetricsData {
 }
 
 const CATEGORY_NAMES: Record<string, string> = {
-  HARMFUL: 'Вред',
-  VIOLENCE: 'Насилие',
-  HATE: 'Ненависть',
-  MEDICAL: 'Медицина',
-  LEGAL: 'Юр. конс.',
-  PII: 'ПДн',
-  MISINFO: 'Дезинф.',
-  NSFW: 'Adult',
-  SELFHARM: 'Суицид',
-  SENSITIVE: 'Сенситив.',
+  HARMFUL: 'HARMFUL',
+  VIOLENCE: 'VIOLENCE',
+  HATE: 'HATE',
+  MEDICAL: 'MEDICAL',
+  LEGAL: 'LEGAL',
+  PII: 'PII',
+  MISINFO: 'MISINFO',
+  NSFW: 'NSFW',
+  SELFHARM: 'SELFHARM',
+  SENSITIVE: 'SENSITIVE',
 };
 
 const ModelMetrics: React.FC = () => {
   const [loading, setLoading] = useState(true);
-  const [retraining, setRetraining] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [data, setData] = useState<ModelMetricsData | null>(null);
+  const [cascadeThreshold, setCascadeThreshold] = useState<number>(0.15);
+  const [updatingThreshold, setUpdatingThreshold] = useState<boolean>(false);
 
   const fetchMetrics = async () => {
     try {
@@ -78,6 +82,12 @@ const ModelMetrics: React.FC = () => {
         setData(json);
       } else {
         message.error('Не удалось загрузить метрики модели.');
+      }
+      
+      const thresholdResponse = await fetch(`${API_BASE}/model/cascade-threshold`);
+      if (thresholdResponse.ok) {
+        const thresholdJson = await thresholdResponse.json();
+        setCascadeThreshold(thresholdJson.cascade_threshold);
       }
     } catch (err) {
       console.error(err);
@@ -91,22 +101,54 @@ const ModelMetrics: React.FC = () => {
     fetchMetrics();
   }, []);
 
-  const handleRetrain = async () => {
-    setRetraining(true);
+  const handleThresholdChange = async (val: number) => {
+    setUpdatingThreshold(true);
     try {
-      const response = await fetch(`${API_BASE}/model/retrain`, { method: 'POST' });
+      const response = await fetch(`${API_BASE}/model/cascade-threshold`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ threshold: val }),
+      });
       if (response.ok) {
         const json = await response.json();
-        message.success(json.message || 'Переобучение успешно завершено!');
-        await fetchMetrics();
+        setCascadeThreshold(json.cascade_threshold);
+        message.success(`Порог каскадного переключения успешно изменен на ${json.cascade_threshold}`);
       } else {
-        message.error('Ошибка при запуске переобучения.');
+        message.error('Не удалось обновить порог каскада.');
       }
     } catch (err) {
       console.error(err);
-      message.error('Сбой сети при переобучении модели.');
+      message.error('Сбой сети при изменении порога.');
     } finally {
-      setRetraining(false);
+      setUpdatingThreshold(false);
+    }
+  };
+
+  const handleExportCSV = async () => {
+    setExporting(true);
+    try {
+      const response = await fetch(`${API_BASE}/logs/export`);
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `audited_logs_${new Date().toISOString().slice(0, 10)}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+        message.success('Размеченные данные успешно экспортированы');
+      } else {
+        message.error('Не удалось выполнить экспорт данных.');
+      }
+    } catch (err) {
+      console.error(err);
+      message.error('Ошибка сети при экспорте данных.');
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -196,7 +238,7 @@ const ModelMetrics: React.FC = () => {
         <Col xs={12} sm={12} md={6}>
           <Card bordered={false} className="premium-card">
             <Statistic
-              title={<span style={{ color: '#475569', fontWeight: 500 }}>Точность (Accuracy)</span>}
+              title={<span style={{ color: '#475569', fontWeight: 500 }}>Accuracy</span>}
               value={data.accuracy * 100}
               precision={1}
               suffix="%"
@@ -208,7 +250,7 @@ const ModelMetrics: React.FC = () => {
         <Col xs={12} sm={12} md={6}>
           <Card bordered={false} className="premium-card">
             <Statistic
-              title={<span style={{ color: '#475569', fontWeight: 500 }}>Precision (Точность рисков)</span>}
+              title={<span style={{ color: '#475569', fontWeight: 500 }}>Precision</span>}
               value={data.precision * 100}
               precision={1}
               suffix="%"
@@ -220,7 +262,7 @@ const ModelMetrics: React.FC = () => {
         <Col xs={12} sm={12} md={6}>
           <Card bordered={false} className="premium-card">
             <Statistic
-              title={<span style={{ color: '#475569', fontWeight: 500 }}>Recall (Полнота обнаружения)</span>}
+              title={<span style={{ color: '#475569', fontWeight: 500 }}>Recall</span>}
               value={data.recall * 100}
               precision={1}
               suffix="%"
@@ -232,16 +274,17 @@ const ModelMetrics: React.FC = () => {
         <Col xs={12} sm={12} md={6}>
           <Card bordered={false} className="premium-card">
             <Statistic
-              title={<span style={{ color: '#475569', fontWeight: 500 }}>F1-Мера (F1-Score)</span>}
+              title={<span style={{ color: '#475569', fontWeight: 500 }}>F₁-Score</span>}
               value={data.f1_score * 100}
               precision={1}
               suffix="%"
-              valueStyle={{ color: '#3b82f6', fontWeight: 700 }}
-              prefix={<RadarChartOutlined style={{ marginRight: 8, color: '#3b82f6' }} />}
+              valueStyle={{ color: '#ec4899', fontWeight: 700 }}
+              prefix={<RadarChartOutlined style={{ marginRight: 8, color: '#ec4899' }} />}
             />
           </Card>
         </Col>
       </Row>
+
 
       {/* Main Grid */}
       <Row gutter={[16, 16]}>
@@ -251,7 +294,7 @@ const ModelMetrics: React.FC = () => {
             title={
               <Space>
                 <BarChartOutlined style={{ color: '#4f46e5' }} />
-                <span>Матрица ошибок (Confusion Matrix)</span>
+                <span>Confusion Matrix</span>
               </Space>
             }
             bordered={false}
@@ -270,35 +313,33 @@ const ModelMetrics: React.FC = () => {
             <div style={{ marginTop: '12px', display: 'flex', gap: '20px', justifyContent: 'center' }}>
               <Space>
                 <div style={{ width: 12, height: 12, borderRadius: 2, background: 'rgba(16, 185, 129, 0.8)' }} />
-                <Text style={{ fontSize: '12px' }}>Верное срабатывание (True Positive)</Text>
+                <Text style={{ fontSize: '12px' }}>True Positive</Text>
               </Space>
               <Space>
                 <div style={{ width: 12, height: 12, borderRadius: 2, background: 'rgba(79, 70, 229, 0.5)' }} />
-                <Text style={{ fontSize: '12px' }}>Перекрестные ошибки классификатора</Text>
+                <Text style={{ fontSize: '12px' }}>Ошибка классификации</Text>
               </Space>
             </div>
           </Card>
         </Col>
 
-        {/* Retraining & Active Learning Controller */}
-        <Col xs={24} lg={8}>
+        {/* Retraining & Active Learning Controller Stack */}
+        <Col xs={24} lg={8} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <Card
             title={
               <Space>
-                <SyncOutlined spin={retraining} style={{ color: '#4f46e5' }} />
-                <span>Центр управления обучением</span>
+                <DownloadOutlined style={{ color: '#4f46e5' }} />
+                <span>Экспорт данных для дообучения</span>
               </Space>
             }
             bordered={false}
             className="premium-card"
-            style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
-            bodyStyle={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}
           >
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
                 <Text type="secondary" style={{ fontSize: '12px' }}>КОНТУР ОБРАТНОЙ СВЯЗИ</Text>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px' }}>
-                  <Text>Проверенные записи (аудит):</Text>
+                  <Text>Проверенные записи аудита:</Text>
                   <Text strong>{data.reviewed_logs_count}</Text>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
@@ -313,31 +354,26 @@ const ModelMetrics: React.FC = () => {
 
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                  <Text style={{ fontSize: '13px' }}>Готовность к переобучению:</Text>
-                  <Text strong style={{ color: data.retrain_needed ? '#f59e0b' : '#10b981' }}>
-                    {data.unreviewed_logs_count} / {data.retrain_threshold}
+                  <Text style={{ fontSize: '13px' }}>Накоплено размеченных записей:</Text>
+                  <Text strong style={{ color: data.reviewed_logs_count > 0 ? '#10b981' : '#94a3b8' }}>
+                    {data.reviewed_logs_count}
                   </Text>
                 </div>
-                <Progress
-                  percent={Math.min(100, Math.round((data.unreviewed_logs_count / data.retrain_threshold) * 100))}
-                  status={data.retrain_needed ? "active" : "normal"}
-                  strokeColor={data.retrain_needed ? '#f59e0b' : '#4f46e5'}
-                />
               </div>
 
-              {data.retrain_needed ? (
+              {data.reviewed_logs_count > 0 ? (
                 <Alert
-                  type="warning"
+                  type="success"
                   showIcon
-                  message="Рекомендуется переобучение"
-                  description={`Накоплено достаточно неразмеченных записей (${data.unreviewed_logs_count} из необходимых ${data.retrain_threshold}) для запуска сессии обучения.`}
+                  message="Данные готовы к экспорту"
+                  description={`Сформирован пул из ${data.reviewed_logs_count} проверенных записей для последующего дообучения ML-специалистом.`}
                 />
               ) : (
                 <Alert
                   type="info"
                   showIcon
-                  message="Модель актуальна"
-                  description="Сбор данных продолжается. Количество новых записей пока не превысило порог."
+                  message="Требуется разметка"
+                  description="В журнале событий пока нет проверенных записей для экспорта."
                 />
               )}
             </div>
@@ -345,11 +381,12 @@ const ModelMetrics: React.FC = () => {
             <div style={{ marginTop: '24px', borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
               <Button
                 type="primary"
-                icon={<SyncOutlined spin={retraining} />}
-                loading={retraining}
+                icon={<DownloadOutlined />}
+                loading={exporting}
+                disabled={data.reviewed_logs_count === 0}
                 block
                 size="large"
-                onClick={handleRetrain}
+                onClick={handleExportCSV}
                 style={{
                   height: '45px',
                   fontWeight: 600,
@@ -357,20 +394,49 @@ const ModelMetrics: React.FC = () => {
                   backgroundColor: '#4f46e5'
                 }}
               >
-                {retraining ? 'Идет переобучение...' : 'Запустить переобучение'}
+                {exporting ? 'Экспорт...' : 'Экспортировать размеченные данные'}
               </Button>
+            </div>
+          </Card>
 
-              <div style={{ marginTop: '12px', textAlign: 'center' }}>
-                {data.last_retrain_time ? (
-                  <Text type="secondary" style={{ fontSize: '11px' }}>
-                    Последнее обучение: {data.last_retrain_time} (Сессий: {data.retrain_count})
-                  </Text>
-                ) : (
-                  <Text type="secondary" style={{ fontSize: '11px' }}>
-                    Модель в исходном состоянии (baseline)
-                  </Text>
-                )}
+          <Card
+            title={
+              <Space>
+                <SlidersOutlined style={{ color: '#4f46e5' }} />
+                <span>Оптимизация каскадной модерации</span>
+              </Space>
+            }
+            bordered={false}
+            className="premium-card"
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <Paragraph style={{ margin: 0, fontSize: '13px', color: '#475569', lineHeight: '1.4' }}>
+                Порог <strong>CASCADE_THRESHOLD</strong> определяет уровень неопределенности базового классификатора, при превышении которого запрос перенаправляется в нейросеть ruBERT.
+              </Paragraph>
+
+              <div style={{ border: '1px solid #f1f5f9', padding: '14px', borderRadius: '8px', backgroundColor: '#fafafa' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <Text strong>Порог переключения:</Text>
+                  <Text strong style={{ color: '#4f46e5', fontSize: '15px' }}>{cascadeThreshold.toFixed(2)}</Text>
+                </div>
+                <Slider
+                  min={0.01}
+                  max={0.99}
+                  step={0.01}
+                  value={cascadeThreshold}
+                  onChange={(val) => setCascadeThreshold(val)}
+                  onAfterChange={handleThresholdChange}
+                  disabled={updatingThreshold}
+                  trackStyle={{ backgroundColor: '#4f46e5' }}
+                  handleStyle={{ borderColor: '#4f46e5', backgroundColor: '#ffffff' }}
+                />
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#64748b', marginTop: '4px' }}>
+                  <span>Экономия ресурсов</span>
+                  <span>Макс. безопасность</span>
+                </div>
               </div>
+
+
             </div>
           </Card>
         </Col>
@@ -383,7 +449,7 @@ const ModelMetrics: React.FC = () => {
             title={
               <Space>
                 <HistoryOutlined style={{ color: '#4f46e5' }} />
-                <span>История качества по эпохам переобучения (Active Learning Curve)</span>
+                <span>История качества по эпохам активного обучения</span>
               </Space>
             }
             bordered={false}
@@ -401,19 +467,20 @@ const ModelMetrics: React.FC = () => {
                   <ChartTooltip formatter={(value: any) => `${(value * 100).toFixed(1)}%`} />
                   <Legend />
                   <Line
-                    name="Точность (Accuracy)"
+                    name="Accuracy"
                     type="monotone"
                     dataKey="accuracy"
                     stroke="#4f46e5"
-                    strokeWidth={2.5}
-                    activeDot={{ r: 8 }}
+                    strokeWidth={2}
+                    strokeDasharray="5 5"
                   />
                   <Line
-                    name="F1-Score"
+                    name="F₁-Score"
                     type="monotone"
                     dataKey="f1_score"
-                    stroke="#3b82f6"
-                    strokeWidth={2}
+                    stroke="#ec4899"
+                    strokeWidth={3}
+                    activeDot={{ r: 8 }}
                   />
                 </LineChart>
               </ResponsiveContainer>

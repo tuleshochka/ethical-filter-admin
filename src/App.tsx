@@ -13,6 +13,8 @@ import { API_BASE } from './types.ts';
 
 const { Content } = Layout;
 
+// Fetch interceptor for token removed as auth is disabled.
+
 // Premium light mode styling tokens
 const appTheme: ThemeConfig = {
   token: {

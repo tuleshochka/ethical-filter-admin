@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Card, Table, Tag, Space, Typography, Button, Drawer, 
-  Radio, Input, Select, Row, Col, Alert, message, Divider 
+  Radio, Input, Select, Row, Col, Alert, message, Divider, Tooltip 
 } from 'antd';
 import { 
   AuditOutlined, 
@@ -11,7 +11,7 @@ import {
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import type { RequestLogEntry } from '../types.ts';
-import { STRATEGY_COLORS, API_BASE } from '../types.ts';
+import { STRATEGY_COLORS, STRATEGY_DESCRIPTIONS, API_BASE } from '../types.ts';
 
 const { Title, Paragraph, Text } = Typography;
 const { TextArea } = Input;
@@ -28,6 +28,7 @@ const Logs: React.FC = () => {
   const [strategyFilter, setStrategyFilter] = useState<string | null>(null);
   const [piiFilter, setPiiFilter] = useState<boolean | null>(null);
   const [reviewedFilter, setReviewedFilter] = useState<boolean | null>(null);
+  const [auditPriorityFilter, setAuditPriorityFilter] = useState<boolean | null>(null);
 
   // Drawer review state
   const [selectedLog, setSelectedLog] = useState<RequestLogEntry | null>(null);
@@ -38,7 +39,7 @@ const Logs: React.FC = () => {
 
   useEffect(() => {
     fetchLogs();
-  }, [page, size, strategyFilter, piiFilter, reviewedFilter]);
+  }, [page, size, strategyFilter, piiFilter, reviewedFilter, auditPriorityFilter]);
 
   const fetchLogs = async () => {
     setLoading(true);
@@ -48,6 +49,7 @@ const Logs: React.FC = () => {
       if (strategyFilter) url += `&strategy=${strategyFilter}`;
       if (piiFilter !== null) url += `&pii_detected=${piiFilter}`;
       if (reviewedFilter !== null) url += `&reviewed=${reviewedFilter}`;
+      if (auditPriorityFilter !== null) url += `&audit_priority=${auditPriorityFilter}`;
 
       const response = await fetch(url);
       if (!response.ok) throw new Error('Не удалось получить журнал логов запросов');
@@ -104,6 +106,7 @@ const Logs: React.FC = () => {
     setStrategyFilter(null);
     setPiiFilter(null);
     setReviewedFilter(null);
+    setAuditPriorityFilter(null);
     setPage(1);
   };
 
@@ -123,7 +126,7 @@ const Logs: React.FC = () => {
       render: (text: string) => <Text code style={{ fontSize: '12px' }}>{text.substring(0, 8)}...</Text>
     },
     {
-      title: 'Маскированный запрос (Preview)',
+      title: 'Маскированный запрос',
       dataIndex: 'request_preview',
       key: 'preview',
       width: '30%',
@@ -147,7 +150,11 @@ const Logs: React.FC = () => {
       dataIndex: 'selected_strategy',
       key: 'strategy',
       width: '10%',
-      render: (strategy: string) => <Tag color={STRATEGY_COLORS[strategy] || 'default'}>{strategy}</Tag>
+      render: (strategy: string) => (
+        <Tooltip title={STRATEGY_DESCRIPTIONS[strategy]}>
+          <Tag color={STRATEGY_COLORS[strategy] || 'default'} style={{ cursor: 'help' }}>{strategy}</Tag>
+        </Tooltip>
+      )
     },
     {
       title: 'PII',
@@ -164,18 +171,26 @@ const Logs: React.FC = () => {
       render: (lat: number) => <Space size={2}><ClockCircleOutlined style={{ color: '#94a3b8' }} /><Text>{lat} мс</Text></Space>
     },
     {
-      title: 'Аудит',
+      title: 'Вердикт',
       dataIndex: 'reviewed',
       key: 'reviewed',
       width: '12%',
-      render: (reviewed: boolean, record: RequestLogEntry) => {
-        if (!reviewed) return <Tag color="warning">Ожидает</Tag>;
-        return record.review_correct ? (
-          <Tag color="success" icon={<CheckCircleOutlined />}>Верно</Tag>
-        ) : (
-          <Tag color="error" icon={<CloseCircleOutlined />}>Ошибка</Tag>
-        );
-      }
+      render: (reviewed: boolean, record: RequestLogEntry) => (
+        <Space>
+          {record.audit_priority && (
+            <Tooltip title="Пограничное значение Uncertainty-based sampling — требует приоритетного внимания ИБ-аналитика">
+              <Tag color="magenta" style={{ fontWeight: 'bold', margin: 0 }}>⚡ Приоритет</Tag>
+            </Tooltip>
+          )}
+          {!reviewed ? (
+            <Tag color="warning" style={{ margin: 0 }}>Ожидает</Tag>
+          ) : record.review_correct ? (
+            <Tag color="success" icon={<CheckCircleOutlined />} style={{ margin: 0 }}>Верно</Tag>
+          ) : (
+            <Tag color="error" icon={<CloseCircleOutlined />} style={{ margin: 0 }}>Ошибка</Tag>
+          )}
+        </Space>
+      )
     }
   ];
 
@@ -184,7 +199,7 @@ const Logs: React.FC = () => {
       <div style={{ marginBottom: '24px' }}>
         <Title level={2} style={{ margin: 0, color: '#0f172a', fontWeight: 700 }}>Журнал событий и Аудит</Title>
         <Paragraph type="secondary" style={{ margin: 0 }}>
-          Просмотр истории запросов, маскированных персональных данных и результатов фильтрации. Разметка решений классификатора для активного дообучения модели (Active Learning).
+          Просмотр истории запросов, маскированных персональных данных и результатов фильтрации. Разметка решений классификатора для активного дообучения модели.
         </Paragraph>
       </div>
 
@@ -245,6 +260,22 @@ const Logs: React.FC = () => {
             />
           </Space>
 
+          <Space size={6}>
+            <Text type="secondary" style={{ fontSize: '13px' }}>Приоритет:</Text>
+            <Select
+              placeholder="Все"
+              value={auditPriorityFilter}
+              onChange={(val) => { setAuditPriorityFilter(val); setPage(1); }}
+              options={[
+                { value: null as unknown as boolean, label: 'Все' },
+                { value: true, label: 'Только приоритетные' },
+                { value: false, label: 'Обычные' },
+              ]}
+              style={{ width: '160px' }}
+              size="small"
+            />
+          </Space>
+
           <Button size="small" onClick={handleResetFilters}>Сбросить фильтры</Button>
         </Space>
       </Card>
@@ -260,7 +291,10 @@ const Logs: React.FC = () => {
           loading={loading}
           onRow={(record) => ({
             onClick: () => handleOpenDrawer(record),
-            style: { cursor: 'pointer' }
+            style: { 
+              cursor: 'pointer',
+              backgroundColor: record.audit_priority && !record.reviewed ? '#fff0f6' : undefined
+            }
           })}
           pagination={{
             current: page,
@@ -331,9 +365,11 @@ const Logs: React.FC = () => {
             <Row gutter={16}>
               <Col span={12}>
                 <Text type="secondary" style={{ fontSize: '11px', display: 'block', textTransform: 'uppercase' }}>ПРИМЕНЕННАЯ СТРАТЕГИЯ</Text>
-                <Tag color={STRATEGY_COLORS[selectedLog.selected_strategy] || 'default'} style={{ marginTop: '4px' }}>
-                  {selectedLog.selected_strategy}
-                </Tag>
+                <Tooltip title={STRATEGY_DESCRIPTIONS[selectedLog.selected_strategy]}>
+                  <Tag color={STRATEGY_COLORS[selectedLog.selected_strategy] || 'default'} style={{ marginTop: '4px', cursor: 'help' }}>
+                    {selectedLog.selected_strategy}
+                  </Tag>
+                </Tooltip>
               </Col>
               <Col span={12}>
                 <Text type="secondary" style={{ fontSize: '11px', display: 'block', textTransform: 'uppercase' }}>ДЕТЕКТИРОВАН PII</Text>
@@ -343,7 +379,7 @@ const Logs: React.FC = () => {
               </Col>
             </Row>
 
-            <Divider style={{ margin: '12px 0' }}>Результат проверки (Аудит)</Divider>
+            <Divider style={{ margin: '12px 0' }}>Вердикт</Divider>
 
             {/* Audit Form */}
             <div>
@@ -356,10 +392,10 @@ const Logs: React.FC = () => {
                   buttonStyle="solid"
                 >
                   <Radio.Button value={true} style={{ width: '230px', textAlign: 'center' }}>
-                    <CheckCircleOutlined /> Верно (Фильтр сработал верно)
+                    <CheckCircleOutlined /> Верно — фильтр сработал корректно
                   </Radio.Button>
                   <Radio.Button value={false} style={{ width: '230px', textAlign: 'center' }}>
-                    <CloseCircleOutlined /> Ошибка (Ложное / Пропуск)
+                    <CloseCircleOutlined /> Ошибка — ложное срабатывание или пропуск
                   </Radio.Button>
                 </Radio.Group>
               </div>
@@ -370,7 +406,7 @@ const Logs: React.FC = () => {
                   rows={4}
                   value={reviewNote}
                   onChange={(e) => setReviewNote(e.target.value)}
-                  placeholder="Опишите дефекты классификации (например, ложное срабатывание на PII или пропуск токсичности)..."
+                  placeholder="Опишите дефекты классификации, например ложное срабатывание на PII или пропуск токсичности..."
                 />
               </div>
 

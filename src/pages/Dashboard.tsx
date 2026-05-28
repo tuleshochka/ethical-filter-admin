@@ -116,22 +116,22 @@ const Dashboard: React.FC = () => {
         </Paragraph>
       </div>
 
-      {/* KPI Cards Row */}
-      <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
-        <Col xs={24} sm={12} md={6}>
-          <Card bordered={false} className="glass-card">
+      {/* KPI Cards Row (Flexbox for 5 premium responsive cards, including P95 latency) */}
+      <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '24px' }}>
+        <div style={{ flex: '1 1 200px' }}>
+          <Card bordered={false} className="premium-card">
             <Statistic
-              title="Всего запросов"
+              title={<span style={{ color: '#475569', fontWeight: 500 }}>Всего запросов</span>}
               value={stats.total_requests}
               prefix={<FileTextOutlined style={{ color: '#4f46e5', marginRight: '8px' }} />}
               valueStyle={{ color: '#0f172a', fontWeight: 700 }}
             />
           </Card>
-        </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card bordered={false} className="glass-card">
+        </div>
+        <div style={{ flex: '1 1 200px' }}>
+          <Card bordered={false} className="premium-card">
             <Statistic
-              title="Срабатываний политик"
+              title={<span style={{ color: '#475569', fontWeight: 500 }}>Срабатываний политик</span>}
               value={stats.violation_rate * 100}
               precision={1}
               valueStyle={{ color: stats.violation_rate > 0.3 ? '#ef4444' : '#1e293b', fontWeight: 700 }}
@@ -139,11 +139,11 @@ const Dashboard: React.FC = () => {
               suffix="%"
             />
           </Card>
-        </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card bordered={false} className="glass-card">
+        </div>
+        <div style={{ flex: '1 1 200px' }}>
+          <Card bordered={false} className="premium-card">
             <Statistic
-              title="Средняя задержка"
+              title={<span style={{ color: '#475569', fontWeight: 500 }}>Средняя задержка</span>}
               value={stats.average_latency_ms}
               precision={0}
               valueStyle={{ color: '#0f172a', fontWeight: 700 }}
@@ -151,11 +151,23 @@ const Dashboard: React.FC = () => {
               suffix=" мс"
             />
           </Card>
-        </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card bordered={false} className="glass-card">
+        </div>
+        <div style={{ flex: '1 1 200px' }}>
+          <Card bordered={false} className="premium-card">
             <Statistic
-              title="Обнаружено PII"
+              title={<span style={{ color: '#475569', fontWeight: 500 }}>Задержка P95</span>}
+              value={stats.p95_latency_ms}
+              precision={0}
+              valueStyle={{ color: stats.p95_latency_ms > 220 ? '#ef4444' : '#0f172a', fontWeight: 700 }}
+              prefix={<ClockCircleOutlined style={{ color: '#ec4899', marginRight: '8px' }} />}
+              suffix=" мс"
+            />
+          </Card>
+        </div>
+        <div style={{ flex: '1 1 200px' }}>
+          <Card bordered={false} className="premium-card">
+            <Statistic
+              title={<span style={{ color: '#475569', fontWeight: 500 }}>Обнаружено PII</span>}
               value={stats.pii_detection_rate * 100}
               precision={1}
               valueStyle={{ color: '#10b981', fontWeight: 700 }}
@@ -163,8 +175,8 @@ const Dashboard: React.FC = () => {
               suffix="%"
             />
           </Card>
-        </Col>
-      </Row>
+        </div>
+      </div>
 
       {/* Charts Row 1: Daily Volume */}
       {stats.daily_volume && stats.daily_volume.length > 0 && (
@@ -206,7 +218,7 @@ const Dashboard: React.FC = () => {
       <Row gutter={[16, 16]}>
         <Col xs={24} lg={12}>
           <Card 
-            title="Сработавшие категории риска (по максимальному скору)" 
+            title="Сработавшие категории риска по максимальному скору" 
             bordered={false}
             style={{ height: '400px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}
           >

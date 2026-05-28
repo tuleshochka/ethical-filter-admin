@@ -60,6 +60,7 @@ export interface RequestLogEntry {
   reviewed: boolean;
   review_correct: boolean | null;
   review_note: string;
+  audit_priority: boolean;
 }
 
 export interface LogListResponse {
@@ -76,6 +77,7 @@ export interface DailyVolume {
 export interface LogStats {
   total_requests: number;
   average_latency_ms: number;
+  p95_latency_ms: number;
   pii_detection_rate: number;
   violation_rate: number;
   strategy_distribution: Record<string, number>;
@@ -86,13 +88,22 @@ export interface LogStats {
 // ────────────────────── UI Constants ──────────────────────────
 
 export const STRATEGY_OPTIONS = [
-  { value: 'ALLOW', label: 'ALLOW (Разрешить)' },
-  { value: 'SOFTEN', label: 'SOFTEN (Смягчить тон)' },
-  { value: 'CAUTION', label: 'CAUTION (Предупреждение)' },
-  { value: 'CLARIFY', label: 'CLARIFY (Уточнить намерение)' },
-  { value: 'REDIRECT', label: 'REDIRECT (Перенаправить)' },
-  { value: 'REFUSE', label: 'REFUSE (Вежливый отказ)' },
+  { value: 'ALLOW', label: 'ALLOW' },
+  { value: 'SOFTEN', label: 'SOFTEN' },
+  { value: 'CAUTION', label: 'CAUTION' },
+  { value: 'CLARIFY', label: 'CLARIFY' },
+  { value: 'REDIRECT', label: 'REDIRECT' },
+  { value: 'REFUSE', label: 'REFUSE' },
 ] as const;
+
+export const STRATEGY_DESCRIPTIONS: Record<string, string> = {
+  ALLOW: 'Разрешить запрос без изменений',
+  SOFTEN: 'Смягчить тон ответа',
+  CAUTION: 'Добавить предупреждение к ответу',
+  CLARIFY: 'Запросить уточнение намерения',
+  REDIRECT: 'Перенаправить запрос на безопасную тему',
+  REFUSE: 'Отказ в обработке небезопасного контента',
+};
 
 export const STRATEGY_COLORS: Record<string, string> = {
   ALLOW: 'success',
@@ -127,4 +138,4 @@ export const CATEGORY_COLORS: Record<string, string> = {
 
 // ────────────────────── API Base ──────────────────────────
 
-export const API_BASE = 'http://127.0.0.1:8000/api/v1';
+export const API_BASE = `${window.location.protocol}//${window.location.hostname}:8000/api/v1`;

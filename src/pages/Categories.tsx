@@ -157,16 +157,11 @@ const Categories: React.FC = () => {
 
   return (
     <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto', animation: 'fadeIn 0.3s ease-out' }}>
-      <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
-          <Title level={2} style={{ margin: 0, color: '#0f172a', fontWeight: 700 }}>Категории риска</Title>
-          <Paragraph type="secondary" style={{ margin: 0 }}>
-            Управление таксономией рисков: включение/отключение категорий, редактирование приоритетов и описаний.
-          </Paragraph>
-        </div>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => setModalOpen(true)}>
-          Добавить категорию
-        </Button>
+      <div style={{ marginBottom: '24px' }}>
+        <Title level={2} style={{ margin: 0, color: '#0f172a', fontWeight: 700 }}>Категории риска</Title>
+        <Paragraph type="secondary" style={{ margin: 0 }}>
+          Управление таксономией рисков: включение/отключение категорий, редактирование приоритетов и описаний.
+        </Paragraph>
       </div>
 
       {error && <Alert message="Ошибка" description={error} type="error" showIcon style={{ marginBottom: '16px' }} />}
@@ -181,31 +176,6 @@ const Categories: React.FC = () => {
           size="middle"
         />
       </Card>
-
-      {/* Create Category Modal */}
-      <Modal
-        title="Создать новую категорию риска"
-        open={modalOpen}
-        onOk={handleCreateCategory}
-        onCancel={() => { setModalOpen(false); form.resetFields(); }}
-        okText="Создать"
-        cancelText="Отмена"
-      >
-        <Form form={form} layout="vertical">
-          <Form.Item name="code" label="Код категории (UPPER_CASE)" rules={[{ required: true }]}>
-            <Input placeholder="Например: EXTREMISM" />
-          </Form.Item>
-          <Form.Item name="name" label="Название" rules={[{ required: true }]}>
-            <Input placeholder="Экстремизм и радикализация" />
-          </Form.Item>
-          <Form.Item name="description" label="Описание">
-            <Input.TextArea rows={2} placeholder="Запросы, связанные с экстремизмом..." />
-          </Form.Item>
-          <Form.Item name="priority" label="Приоритет" initialValue={5}>
-            <InputNumber min={0} max={100} />
-          </Form.Item>
-        </Form>
-      </Modal>
     </div>
   );
 };
