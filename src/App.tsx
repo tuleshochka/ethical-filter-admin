@@ -13,7 +13,32 @@ import { API_BASE } from './types.ts';
 
 const { Content } = Layout;
 
-// Fetch interceptor for token removed as auth is disabled.
+import Login from './pages/Login.tsx';
+
+// Fetch interceptor to inject Bearer token automatically for API calls
+const originalFetch = window.fetch;
+window.fetch = async (input, init) => {
+  const token = localStorage.getItem('admin_token');
+  const url = typeof input === 'string' ? input : (input instanceof Request ? input.url : '');
+  const isApiCall = url.includes('/api/v1') && !url.includes('/auth/login');
+
+  if (token && isApiCall) {
+    init = init || {};
+    init.headers = {
+      ...init.headers,
+      'Authorization': `Bearer ${token}`,
+    };
+  }
+
+  const response = await originalFetch(input, init);
+
+  if (response.status === 401 && isApiCall) {
+    localStorage.removeItem('admin_token');
+    window.location.reload();
+  }
+
+  return response;
+};
 
 // Premium light mode styling tokens
 const appTheme: ThemeConfig = {
@@ -50,11 +75,14 @@ const appTheme: ThemeConfig = {
 };
 
 function App(): React.ReactElement {
+  const [token, setToken] = useState<string | null>(localStorage.getItem('admin_token'));
   const [activePolicy, setActivePolicy] = useState<Policy | null>(null);
 
   useEffect(() => {
-    fetchActivePolicy();
-  }, []);
+    if (token) {
+      fetchActivePolicy();
+    }
+  }, [token]);
 
   const fetchActivePolicy = async () => {
     try {
@@ -70,6 +98,14 @@ function App(): React.ReactElement {
       console.error('Failed to fetch active policy:', err);
     }
   };
+
+  if (!token) {
+    return (
+      <ConfigProvider theme={appTheme}>
+        <Login onLoginSuccess={(t) => setToken(t)} />
+      </ConfigProvider>
+    );
+  }
 
   return (
     <ConfigProvider theme={appTheme}>
