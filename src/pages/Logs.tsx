@@ -29,6 +29,7 @@ const Logs: React.FC = () => {
   const [piiFilter, setPiiFilter] = useState<boolean | null>(null);
   const [reviewedFilter, setReviewedFilter] = useState<boolean | null>(null);
   const [auditPriorityFilter, setAuditPriorityFilter] = useState<boolean | null>(null);
+  const [classificationLevelFilter, setClassificationLevelFilter] = useState<number | null>(null);
 
   // Drawer review state
   const [selectedLog, setSelectedLog] = useState<RequestLogEntry | null>(null);
@@ -39,7 +40,7 @@ const Logs: React.FC = () => {
 
   useEffect(() => {
     fetchLogs();
-  }, [page, size, strategyFilter, piiFilter, reviewedFilter, auditPriorityFilter]);
+  }, [page, size, strategyFilter, piiFilter, reviewedFilter, auditPriorityFilter, classificationLevelFilter]);
 
   const fetchLogs = async () => {
     setLoading(true);
@@ -50,6 +51,7 @@ const Logs: React.FC = () => {
       if (piiFilter !== null) url += `&pii_detected=${piiFilter}`;
       if (reviewedFilter !== null) url += `&reviewed=${reviewedFilter}`;
       if (auditPriorityFilter !== null) url += `&audit_priority=${auditPriorityFilter}`;
+      if (classificationLevelFilter !== null) url += `&classification_level=${classificationLevelFilter}`;
 
       const response = await fetch(url);
       if (!response.ok) throw new Error('Не удалось получить журнал логов запросов');
@@ -107,6 +109,7 @@ const Logs: React.FC = () => {
     setPiiFilter(null);
     setReviewedFilter(null);
     setAuditPriorityFilter(null);
+    setClassificationLevelFilter(null);
     setPage(1);
   };
 
@@ -169,6 +172,16 @@ const Logs: React.FC = () => {
       key: 'latency',
       width: '8%',
       render: (lat: number) => <Space size={2}><ClockCircleOutlined style={{ color: '#94a3b8' }} /><Text>{lat} мс</Text></Space>
+    },
+    {
+      title: 'Уровень каскада',
+      dataIndex: 'classification_level',
+      key: 'classification_level',
+      width: '12%',
+      render: (level: number) => {
+        if (level === 2) return <Tag color="geekblue">ruBERT</Tag>;
+        return <Tag color="orange">baseline</Tag>;
+      }
     },
     {
       title: 'Вердикт',
@@ -276,6 +289,22 @@ const Logs: React.FC = () => {
             />
           </Space>
 
+          <Space size={6}>
+            <Text type="secondary" style={{ fontSize: '13px' }}>Каскад:</Text>
+            <Select
+              placeholder="Все"
+              value={classificationLevelFilter}
+              onChange={(val) => { setClassificationLevelFilter(val); setPage(1); }}
+              options={[
+                { value: null as unknown as number, label: 'Все' },
+                { value: 1, label: 'Базовый (baseline)' },
+                { value: 2, label: 'Нейросетевой (ruBERT)' },
+              ]}
+              style={{ width: '150px' }}
+              size="small"
+            />
+          </Space>
+
           <Button size="small" onClick={handleResetFilters}>Сбросить фильтры</Button>
         </Space>
       </Card>
@@ -340,6 +369,33 @@ const Logs: React.FC = () => {
                 <Text strong>{selectedLog.latency_ms} мс</Text>
               </Col>
             </Row>
+
+            <Row gutter={16}>
+              <Col span={12}>
+                <Text type="secondary" style={{ fontSize: '11px', display: 'block', textTransform: 'uppercase' }}>ДОМЕН</Text>
+                <Text strong>{selectedLog.domain || '—'}</Text>
+              </Col>
+              <Col span={12}>
+                <Text type="secondary" style={{ fontSize: '11px', display: 'block', textTransform: 'uppercase' }}>КАНАЛ</Text>
+                <Text strong>{selectedLog.channel || '—'}</Text>
+              </Col>
+            </Row>
+
+            {selectedLog.history_json && Array.isArray(selectedLog.history_json) && selectedLog.history_json.length > 0 && (
+              <div>
+                <Text type="secondary" style={{ fontSize: '11px', display: 'block', textTransform: 'uppercase', marginBottom: '8px' }}>ИСТОРИЯ ДИАЛОГА</Text>
+                <div style={{ maxHeight: '200px', overflowY: 'auto', padding: '12px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  {selectedLog.history_json.map((msg: any, i: number) => (
+                    <div key={i} style={{ marginBottom: '8px', fontSize: '12px' }}>
+                      <Text type="secondary" strong>{msg.role === 'user' ? 'Пользователь: ' : 'Ассистент: '}</Text>
+                      <Paragraph style={{ margin: 0, paddingLeft: '8px', borderLeft: '2px solid #cbd5e1' }}>
+                        {msg.content}
+                      </Paragraph>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div>
               <Text type="secondary" style={{ fontSize: '11px', display: 'block', textTransform: 'uppercase', marginBottom: '4px' }}>МАСКИРОВАННЫЙ ТЕКСТ</Text>

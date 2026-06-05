@@ -74,13 +74,34 @@ const appTheme: ThemeConfig = {
   }
 };
 
+const parseTokenRole = (t: string | null): string | null => {
+  if (!t) return null;
+  try {
+    const payloadB64 = t.split('.')[0];
+    let base64 = payloadB64.replace(/-/g, '+').replace(/_/g, '/');
+    while (base64.length % 4) {
+      base64 += '=';
+    }
+    const jsonStr = atob(base64);
+    const payload = JSON.parse(jsonStr);
+    return payload.role || null;
+  } catch (e) {
+    console.error('Failed to parse token role:', e);
+    return null;
+  }
+};
+
 function App(): React.ReactElement {
   const [token, setToken] = useState<string | null>(localStorage.getItem('admin_token'));
+  const [role, setRole] = useState<string | null>(parseTokenRole(token));
   const [activePolicy, setActivePolicy] = useState<Policy | null>(null);
 
   useEffect(() => {
     if (token) {
+      setRole(parseTokenRole(token));
       fetchActivePolicy();
+    } else {
+      setRole(null);
     }
   }, [token]);
 
@@ -110,15 +131,24 @@ function App(): React.ReactElement {
   return (
     <ConfigProvider theme={appTheme}>
       <Layout style={{ minHeight: '100vh', flexDirection: 'row' }}>
-        <Sidebar activePolicy={activePolicy} />
+        <Sidebar activePolicy={activePolicy} role={role} />
         <Layout style={{ flex: 1, minWidth: 0 }}>
           <Content style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
             <Routes>
               <Route path="/" element={<Dashboard />} />
-              <Route path="/policies" element={<Policies onPolicyChanged={setActivePolicy} />} />
+              <Route 
+                path="/policies" 
+                element={role === 'admin' ? <Policies onPolicyChanged={setActivePolicy} /> : <Navigate to="/" replace />} 
+              />
               <Route path="/logs" element={<Logs />} />
-              <Route path="/categories" element={<Categories />} />
-              <Route path="/model" element={<ModelMetrics />} />
+              <Route 
+                path="/categories" 
+                element={role === 'admin' ? <Categories /> : <Navigate to="/" replace />} 
+              />
+              <Route 
+                path="/model" 
+                element={role === 'admin' ? <ModelMetrics /> : <Navigate to="/" replace />} 
+              />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </Content>

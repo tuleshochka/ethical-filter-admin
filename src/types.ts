@@ -61,6 +61,18 @@ export interface RequestLogEntry {
   review_correct: boolean | null;
   review_note: string;
   audit_priority: boolean;
+  classification_level: number;
+  history_json: any;
+  domain?: string;
+  channel?: string;
+}
+
+export interface CascadeThresholds {
+  cascade_threshold: number;
+  per_class_thresholds: Record<string, number> | null;
+  min_length_for_bert: number;
+  allow_llm_bypass: boolean;
+  classifier_model: string;
 }
 
 export interface LogListResponse {

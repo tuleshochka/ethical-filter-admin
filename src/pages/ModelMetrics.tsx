@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Card, Col, Row, Statistic, Spin, Alert, Button, Progress, Table, Typography, Space, Tooltip, message, Badge, Slider
+  Card, Col, Row, Statistic, Spin, Alert, Button, Progress, Table, Typography, Space, Tooltip, message, Badge, Slider, Divider
 } from 'antd';
 import {
   SafetyOutlined,
@@ -48,8 +48,8 @@ interface ModelMetricsData {
   reviewed_logs_count: number;
   correct_reviews_count: number;
   unreviewed_logs_count: number;
-  retrain_needed: boolean;
-  retrain_threshold: number;
+  export_recommended: boolean;
+  export_threshold: number;
   last_retrain_time: string | null;
   retrain_count: number;
 }
@@ -73,6 +73,19 @@ const ModelMetrics: React.FC = () => {
   const [data, setData] = useState<ModelMetricsData | null>(null);
   const [cascadeThreshold, setCascadeThreshold] = useState<number>(0.15);
   const [updatingThreshold, setUpdatingThreshold] = useState<boolean>(false);
+  const [perClassThresholds, setPerClassThresholds] = useState<Record<string, number>>({
+    HARMFUL: 0.10,
+    VIOLENCE: 0.05,
+    HATE: 0.10,
+    NSFW: 0.05,
+    SELFHARM: 0.005,
+    SENSITIVE: 0.40,
+    MEDICAL: 0.001,
+    LEGAL: 0.001,
+    ILLEGAL: 0.001,
+    PII: 0.001
+  });
+  const [savingPerClass, setSavingPerClass] = useState<boolean>(false);
 
   const fetchMetrics = async () => {
     try {
@@ -88,6 +101,9 @@ const ModelMetrics: React.FC = () => {
       if (thresholdResponse.ok) {
         const thresholdJson = await thresholdResponse.json();
         setCascadeThreshold(thresholdJson.cascade_threshold);
+        if (thresholdJson.per_class_thresholds) {
+          setPerClassThresholds(thresholdJson.per_class_thresholds);
+        }
       }
     } catch (err) {
       console.error(err);
@@ -100,6 +116,31 @@ const ModelMetrics: React.FC = () => {
   useEffect(() => {
     fetchMetrics();
   }, []);
+
+  const handleSavePerClassThresholds = async () => {
+    setSavingPerClass(true);
+    try {
+      const response = await fetch(`${API_BASE}/model/cascade-threshold/per-class`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ thresholds: perClassThresholds }),
+      });
+      if (response.ok) {
+        const json = await response.json();
+        setPerClassThresholds(json.per_class_thresholds);
+        message.success('Поклассовые пороги успешно сохранены!');
+      } else {
+        message.error('Не удалось сохранить поклассовые пороги.');
+      }
+    } catch (err) {
+      console.error(err);
+      message.error('Сбой сети при сохранении порогов.');
+    } finally {
+      setSavingPerClass(false);
+    }
+  };
 
   const handleThresholdChange = async (val: number) => {
     setUpdatingThreshold(true);
@@ -361,7 +402,14 @@ const ModelMetrics: React.FC = () => {
                 </div>
               </div>
 
-              {data.reviewed_logs_count > 0 ? (
+              {data.export_recommended ? (
+                <Alert
+                  type="warning"
+                  showIcon
+                  message="Рекомендуется экспорт"
+                  description={`Накоплено ${data.unreviewed_logs_count} неразмеченных/ожидающих записей (порог: ${data.export_threshold}). Пожалуйста, выполните экспорт для передачи ML-специалисту.`}
+                />
+              ) : data.reviewed_logs_count > 0 ? (
                 <Alert
                   type="success"
                   showIcon
@@ -436,7 +484,42 @@ const ModelMetrics: React.FC = () => {
                 </div>
               </div>
 
-
+              <Divider style={{ margin: '12px 0' }} />
+              
+              <Text strong style={{ display: 'block', marginBottom: '8px' }}>Поклассовые пороги эскалации:</Text>
+              <Paragraph style={{ margin: 0, fontSize: '12px', color: '#64748b', lineHeight: '1.4' }}>
+                Калибруемые пороги для отдельных категорий. Низкие пороги (0.01–0.10) для критических рисков обеспечивают частую эскалацию (снижение FN). Высокие пороги (0.40) для менее критичных рисков расширяют fast-path (снижение latency).
+              </Paragraph>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px', maxHeight: '300px', overflowY: 'auto', paddingRight: '4px' }}>
+                {Object.entries(perClassThresholds).map(([cls, val]) => (
+                  <div key={cls} style={{ border: '1px solid #f1f5f9', padding: '8px 12px', borderRadius: '6px', backgroundColor: '#fafafa' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '2px' }}>
+                      <Text strong style={{ fontSize: '11px' }}>{cls}</Text>
+                      <Text strong style={{ color: '#4f46e5', fontSize: '12px' }}>{val.toFixed(3)}</Text>
+                    </div>
+                    <Slider
+                      min={0.001}
+                      max={0.999}
+                      step={0.001}
+                      value={val}
+                      onChange={(newVal) => setPerClassThresholds(prev => ({ ...prev, [cls]: newVal }))}
+                      trackStyle={{ backgroundColor: '#4f46e5' }}
+                      handleStyle={{ borderColor: '#4f46e5', backgroundColor: '#ffffff' }}
+                    />
+                  </div>
+                ))}
+              </div>
+              
+              <Button
+                type="primary"
+                onClick={handleSavePerClassThresholds}
+                loading={savingPerClass}
+                style={{ marginTop: '12px', backgroundColor: '#4f46e5' }}
+                block
+              >
+                Сохранить поклассовые пороги
+              </Button>
             </div>
           </Card>
         </Col>

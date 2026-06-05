@@ -17,9 +17,10 @@ const { Title, Text } = Typography;
 
 interface SidebarProps {
   activePolicy: Policy | null;
+  role: string | null;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ activePolicy }) => {
+const Sidebar: React.FC<SidebarProps> = ({ activePolicy, role }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [unreviewedCount, setUnreviewedCount] = React.useState(0);
@@ -42,7 +43,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activePolicy }) => {
     return () => clearInterval(interval);
   }, []);
 
-  const menuItems: MenuProps['items'] = [
+  const baseMenuItems: MenuProps['items'] = [
     {
       key: '/',
       icon: <DashboardOutlined style={{ fontSize: '18px' }} />,
@@ -80,6 +81,13 @@ const Sidebar: React.FC<SidebarProps> = ({ activePolicy }) => {
       label: 'Метрики модели',
     },
   ];
+
+  const menuItems = baseMenuItems.filter(item => {
+    if (item?.key === '/policies' || item?.key === '/categories' || item?.key === '/model') {
+      return role === 'admin';
+    }
+    return true;
+  });
 
   const handleMenuClick: MenuProps['onClick'] = ({ key }) => {
     navigate(key);
